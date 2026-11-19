@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KN-Mescla</title>
+<!-- SheetJS: para uso 100% offline, baixe o arquivo e troque o src por "xlsx.full.min.js" -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#0a1f44;--navy2:#13306b;--navy3:#e8edf6;--line:#cfd8e8;--white:#fff;--ok:#1f7a4d;--err:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--navy3);color:var(--navy);line-height:1.5}
+header{background:var(--navy);color:var(--white);padding:28px 24px}
+header div{max-width:1000px;margin:0 auto}
+h1{margin:0;font-size:2rem;letter-spacing:-.02em;font-weight:800}
+header p{margin:4px 0 0;color:#b9c7e6}
+main{max-width:1000px;margin:0 auto;padding:24px;display:grid;gap:20px}
+section{background:var(--white);border:1px solid var(--line);border-left:5px solid var(--navy);border-radius:6px;padding:20px}
+h2{margin:0 0 12px;font-size:1.1rem}
+#drop{border:2px dashed var(--navy2);border-radius:6px;padding:32px;text-align:center;cursor:pointer;background:var(--navy3)}
+#drop.over{background:#d5dff2}
+#drop:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #5b86d6;outline-offset:2px}
+.hint{color:#51618a;font-size:.9rem}
+ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+li{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:4px}
+li .n{flex:1;overflow-wrap:anywhere}
+li .m{color:#51618a;font-size:.85rem;white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:end}
+label{display:grid;gap:4px;font-weight:600;font-size:.9rem}
+select,input[type=text]{padding:8px;border:1px solid var(--navy2);border-radius:4px;font:inherit;background:var(--white);color:var(--navy)}
+.chk{display:flex;align-items:center;gap:8px;font-weight:400}
+button{font:inherit;font-weight:600;padding:10px 18px;border-radius:4px;border:2px solid var(--navy);background:var(--navy);color:var(--white);cursor:pointer}
+button.alt{background:var(--white);color:var(--navy)}
+button:hover:not(:disabled){background:var(--navy2);color:var(--white)}
+button:disabled{opacity:.4;cursor:not-allowed}
+#msg{min-height:1.4em;font-weight:600}
+.tw{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:4px;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th{position:sticky;top:0;background:var(--navy);color:var(--white);text-align:left}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+tr:nth-child(even) td{background:var(--navy3)}
+footer{text-align:center;color:#51618a;font-size:.85rem;padding:0 0 28px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><div>
+<h1>KN-Mescla</h1>
+<p>Mescle planilhas CSV e Excel direto no navegador. Seus dados não saem do seu computador.</p>
+</div></header>
+<main>
+<section>
+<h2>1. Adicione as planilhas</h2>
+<div id="drop" tabindex="0" role="button" aria-label="Selecionar arquivos">
+<strong>Arraste os arquivos aqui ou clique para escolher</strong><br>
+<span class="hint">Aceita .csv, .tsv, .xlsx, .xls e .ods. Cada aba vira uma fonte.</span>
+</div>
+<input id="file" type="file" multiple accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods" hidden>
+<ul id="list"></ul>
+</section>
+
+<section id="opts" hidden>
+<h2>2. Escolha como mesclar</h2>
+<div class="row">
+<label>Modo
+<select id="mode">
+<option value="stack">Empilhar linhas (união das colunas)</option>
+<option value="join">Juntar por coluna-chave</option>
+</select></label>
+<label id="keyBox" hidden>Coluna-chave
+<select id="key"></select></label>
+<label id="jtBox" hidden>Tipo de junção
+<select id="jt">
+<option value="left">Manter todas da primeira (left)</option>
+<option value="inner">Só correspondências (inner)</option>
+<option value="full">Manter todas (full)</option>
+</select></label>
+</div>
+<div class="row" style="margin-top:14px">
+<label class="chk"><input type="checkbox" id="origin"> Adicionar coluna “origem” (arquivo e aba)</label>
+<label class="chk"><input type="checkbox" id="dedup"> Remover linhas duplicadas</label>
+</div>
+<div class="row" style="margin-top:16px">
+<button id="go">Mesclar</button>
+<button class="alt" id="clear">Limpar tudo</button>
+</div>
+<p id="msg" role="status"></p>
+</section>
+
+<section id="res" hidden>
+<h2>3. Resultado</h2>
+<div class="row">
+<span id="info" class="hint" style="flex:1"></span>
+<label>Separador do CSV
+<select id="fs"><option value=";">Ponto e vírgula (;)</option><option value=",">Vírgula (,)</option><option value="&#9;">Tab</option></select></label>
+<label>Nome do arquivo
+<input type="text" id="fname" value="kn-mescla"></label>
+<button id="dlx">Baixar XLSX</button>
+<button class="alt" id="dlc">Baixar CSV</button>
+</div>
+<div class="tw"><table id="tbl"></table></div>
+</section>
+</main>
+<footer>KN-Mescla · processamento local, sem envio de dados</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+let sources=[],out={rows:[],cols:[]},uid=0;
+
+// ---------- leitura ----------
+async function readFile(f){
+  const ext=f.name.split('.').pop().toLowerCase();
+  let wb;
+  if(['csv','tsv','txt'].includes(ext)) wb=XLSX.read(await f.text(),{type:'string',cellDates:true});
+  else wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+  wb.SheetNames.forEach(sn=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:true});
+    if(!rows.length) return;
+    const cols=[];
+    rows.forEach(r=>Object.keys(r).forEach(c=>{if(!cols.includes(c))cols.push(c)}));
+    const multi=wb.SheetNames.length>1;
+    sources.push({id:uid++,file:f.name,sheet:multi?sn:'',rows,cols,on:true});
+  });
+}
+async function addFiles(files){
+  $('msg').textContent='';
+  for(const f of files){
+    try{await readFile(f)}catch(e){say('Não foi possível ler “'+f.name+'”: '+e.message,1)}
+  }
+  render();
+}
+
+// ---------- interface ----------
+function say(t,err){const m=$('msg');m.textContent=t;m.style.color=err?'var(--err)':'var(--ok)'}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function active(){return sources.filter(s=>s.on)}
+function render(){
+  $('list').innerHTML=sources.map(s=>`<li><input type="checkbox" data-id="${s.id}" ${s.on?'checked':''} aria-label="Usar fonte">
+    <span class="n">${esc(s.file)}${s.sheet?' › '+esc(s.sheet):''}</span>
+    <span class="m">${s.rows.length} linhas · ${s.cols.length} colunas</span>
+    <button class="alt" data-rm="${s.id}" style="padding:2px 10px">Remover</button></li>`).join('');
+  $('opts').hidden=!sources.length;
+  if(!sources.length)$('res').hidden=true;
+  updateKeys();
+}
+function updateKeys(){
+  const a=active(),join=$('mode').value==='join';
+  $('keyBox').hidden=$('jtBox').hidden=!join;
+  if(!a.length)return;
+  const common=a[0].cols.filter(c=>a.every(s=>s.cols.includes(c)));
+  const cur=$('key').value;
+  $('key').innerHTML=common.map(c=>`<option ${c===cur?'selected':''}>${esc(c)}</option>`).join('')||'<option value="">(nenhuma coluna em comum)</option>';
+}
+$('list').addEventListener('change',e=>{
+  const s=sources.find(x=>x.id==e.target.dataset.id); if(s){s.on=e.target.checked;updateKeys()}
+});
+$('list').addEventListener('click',e=>{
+  const id=e.target.dataset.rm; if(id===undefined)return;
+  sources=sources.filter(x=>x.id!=id); render();
+});
+$('mode').onchange=updateKeys;
+$('clear').onclick=()=>{sources=[];out={rows:[],cols:[]};$('file').value='';say('');render()};
+const drop=$('drop');
+drop.onclick=()=>$('file').click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
+$('file').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
+
+// ---------- mesclagem ----------
+const label=s=>s.file+(s.sheet?' › '+s.sheet:'');
+const norm=v=>v instanceof Date?v.toISOString():String(v).trim().toLowerCase();
+
+function stack(a,withOrigin){
+  const cols=[];a.forEach(s=>s.cols.forEach(c=>{if(!cols.includes(c))cols.push(c)}));
+  const rows=[];
+  a.forEach(s=>s.rows.forEach(r=>{
+    const o={};cols.forEach(c=>o[c]=r[c]??'');
+    if(withOrigin)o['origem']=label(s);
+    rows.push(o);
+  }));
+  if(withOrigin)cols.push('origem');
+  return{rows,cols};
+}
+
+function join(a,key,type,withOrigin){
+  let cols=[...a[0].cols];
+  let acc=a[0].rows.map(r=>({...r}));
+  if(withOrigin){cols.push('origem');acc.forEach(r=>r.origem=label(a[0]))}
+  for(let i=1;i<a.length;i++){
+    const s=a[i],map=new Map(),ren={};
+    s.rows.forEach(r=>{const k=norm(r[key]);if(!map.has(k))map.set(k,[]);map.get(k).push(r)});
+    s.cols.forEach(c=>{
+      if(c===key)return;
+      let n=c,j=i+1;
+      while(cols.includes(n))n=c+'_'+(j++);
+      ren[c]=n;cols.push(n);
+    });
+    const conv=r=>{const o={};for(const c in ren)o[ren[c]]=r[c]??'';return o};
+    const res=[],used=new Set();
+    acc.forEach(r=>{
+      const k=norm(r[key]),m=map.get(k);
+      if(m){used.add(k);m.forEach(x=>res.push({...r,...conv(x)}))}
+      else if(type!=='inner')res.push({...r});
+    });
+    if(type==='full')s.rows.forEach(r=>{
+      if(!used.has(norm(r[key]))){const o={[key]:r[key],...conv(r)};if(withOrigin)o.origem=label(s);res.push(o)}
+    });
+    acc=res;
+  }
+  acc=acc.map(r=>{const o={};cols.forEach(c=>o[c]=r[c]??'');return o});
+  return{rows:acc,cols};
+}
+
+$('go').onclick=()=>{
+  const a=active();
+  if(!a.length)return say('Selecione ao menos uma fonte.',1);
+  const wo=$('origin').checked;
+  let r;
+  if($('mode').value==='join'){
+    const k=$('key').value;
+    if(a.length<2)return say('Para juntar por chave, selecione ao menos duas fontes.',1);
+    if(!k)return say('Nenhuma coluna em comum entre as fontes selecionadas.',1);
+    r=join(a,k,$('jt').value,wo);
+  }else r=stack(a,wo);
+  if($('dedup').checked){
+    const seen=new Set();
+    r.rows=r.rows.filter(x=>{const k=JSON.stringify(r.cols.map(c=>x[c]));if(seen.has(k))return false;seen.add(k);return true});
+  }
+  out=r;showResult();
+};
+
+function showResult(){
+  $('res').hidden=false;
+  $('info').textContent=out.rows.length.toLocaleString('pt-BR')+' linhas · '+out.cols.length+' colunas'+(out.rows.length>100?' (prévia das 100 primeiras)':'');
+  const fmt=v=>v instanceof Date?v.toLocaleDateString('pt-BR'):esc(v);
+  $('tbl').innerHTML='<thead><tr>'+out.cols.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>'+
+    out.rows.slice(0,100).map(r=>'<tr>'+out.cols.map(c=>`<td>${fmt(r[c])}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  say('Mesclagem concluída.');
+  $('res').scrollIntoView({behavior:'smooth'});
+}
+
+// ---------- exportação ----------
+const sheet=()=>XLSX.utils.json_to_sheet(out.rows,{header:out.cols});
+const name=()=>($('fname').value.trim()||'kn-mescla').replace(/[\\/:*?"<>|]/g,'_');
+$('dlx').onclick=()=>{
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sheet(),'Mesclado');
+  XLSX.writeFile(wb,name()+'.xlsx');
+};
+$('dlc').onclick=()=>{
+  const csv='\uFEFF'+XLSX.utils.sheet_to_csv(sheet(),{FS:$('fs').value});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=name()+'.csv';a.click();URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>
